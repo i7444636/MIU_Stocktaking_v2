@@ -1,0 +1,41 @@
+# Worklog
+
+## 2026-08-06
+
+### 작업 목적
+
+- 기존 재고대조분석기와 분리된 v2 저장소 및 GitHub Pages 사이트 구축
+- 전매장 매입매출장의 판매 바코드를 반영해 미스캔 오분류 방지
+- 사용 안내 보강 및 GitHub UI 기반 디자인 적용
+
+### 변경 사항
+
+- 세 번째 입력 파일인 전매장 매입매출장 업로드 단계 추가
+- `매출` 시트 E열의 판매 바코드를 읽어 중복 제거된 판매 목록 생성
+- 미스캔 조건에 `전매장 매출 목록에 없는 바코드` 조건 추가
+- 사이트 이름을 `재고대조분석기_v2`로 변경
+- 필요한 파일, 시트, 열 및 미스캔 판정 기준을 상단에 안내
+- 사용 방법과 판정 기준을 설명하는 `README.md` 추가
+- GitHub 스타일의 시스템 폰트, 회색 배경, 흰 카드, 파란 안내 요소 및 초록 실행 버튼 적용
+- 모바일 화면에서 카드 헤더와 통계가 한 열로 표시되도록 반응형 스타일 개선
+
+### 관련 커밋
+
+- `ed9eccd` — Add stocktaking sales exclusion workflow
+- `f114738` — Polish v2 site guidance and add README
+- `e7bded5` — Restyle interface with GitHub-inspired theme
+
+### 검증
+
+- 제공된 전매장 매입매출장의 `매출` 시트 E열 구조 확인
+- 정규화 후 고유 판매 바코드 30,088건 확인
+- JavaScript 문법 검사 통과
+- Git diff 공백 오류 검사 통과
+- GitHub Pages 빌드 성공 확인
+- 배포 사이트 HTTP 200 응답 확인
+- 배포된 페이지에서 v2 제목, 3단계 업로드, 필수 안내 및 GitHub 테마 반영 확인
+
+### 배포
+
+- 저장소: https://github.com/i7444636/MIU_Stocktaking_v2
+- 사이트: https://i7444636.github.io/MIU_Stocktaking_v2/
