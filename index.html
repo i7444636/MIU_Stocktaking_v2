@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>재고 대조 분석기 — 마켓인유</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=IBM+Plex+Mono:wght@400;600&display=swap');
+
+  :root {
+    --bg: #F5F0E8;
+    --surface: #FDFAF4;
+    --border: #D6CDB8;
+    --text: #2A2520;
+    --sub: #7A7065;
+    --accent: #C8501A;
+    --accent2: #4A7C59;
+    --warn: #C8501A;
+    --ok: #4A7C59;
+    --mismatch: #B07A20;
+    --new: #6B4FA0;
+    --miss: #888078;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Gowun Dodum', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 24px 80px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .brand {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--sub);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1.2;
+  }
+
+  h1 span {
+    color: var(--accent);
+  }
+
+  .subtitle {
+    margin-top: 8px;
+    font-size: 14px;
+    color: var(--sub);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    width: 100%;
+    max-width: 620px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    background: #F7F2E9;
+  }
+
+  .step-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    background: #FBEEE8;
+    border: 1px solid #E8C4B0;
+    border-radius: 2px;
+    padding: 2px 7px;
+    letter-spacing: 0.05em;
+  }
+
+  .card-title {
+    font-size: 14px;
+    color: var(--text);
+  }
+
+  .card-desc {
+    font-size: 12px;
+    color: var(--sub);
+    margin-left: auto;
+  }
+
+  .card-body {
+    padding: 20px;
+  }
+
+  .upload-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: 3px;
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: #FBF5EE;
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+    opacity: 0.5;
+  }
+
+  .upload-text {
+    font-size: 14px;
+    color: var(--sub);
+  }
+
+  .upload-text strong {
+    color: var(--text);
+  }
+
+  .file-loaded {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: #EFF5F1;
+    border: 1px solid #B8D4C0;
+    border-radius: 3px;
+    font-size: 13px;
+    color: var(--ok);
+  }
+
+  .file-loaded .filename {
+    color: var(--text);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .file-loaded .row-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--sub);
+    white-space: nowrap;
+  }
+
+  .run-btn {
+    display: block;
+    width: 100%;
+    max-width: 620px;
+    padding: 16px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-family: 'Gowun Dodum', sans-serif;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 16px;
+    letter-spacing: 0.02em;
+  }
+
+  .run-btn:hover:not(:disabled) {
+    background: #B04415;
+    transform: translateY(-1px);
+  }
+
+  .run-btn:disabled {
+    background: var(--border);
+    color: var(--sub);
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Progress */
+  .progress-area {
+    display: none;
+    width: 100%;
+    max-width: 620px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .progress-label {
+    font-size: 13px;
+    color: var(--sub);
+    margin-bottom: 10px;
+  }
+
+  .progress-bar-bg {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.2s ease;
+    width: 0%;
+  }
+
+  /* Results */
+  .result-area {
+    display: none;
+    width: 100%;
+    max-width: 620px;
+  }
+
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .result-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--sub);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .stat-box {
+    padding: 14px 16px;
+    border-radius: 3px;
+    border-left: 3px solid;
+  }
+
+  .stat-box.ok    { background: #EFF5F1; border-color: var(--ok); }
+  .stat-box.mis   { background: #FEF6EE; border-color: var(--mismatch); }
+  .stat-box.new   { background: #F3EFF8; border-color: var(--new); }
+  .stat-box.miss  { background: #F5F4F2; border-color: var(--miss); }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--sub);
+    margin-bottom: 4px;
+  }
+
+  .stat-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .stat-num.ok   { color: var(--ok); }
+  .stat-num.mis  { color: var(--mismatch); }
+  .stat-num.new  { color: var(--new); }
+  .stat-num.miss { color: var(--miss); }
+
+  .download-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 14px;
+    background: var(--ok);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-family: 'Gowun Dodum', sans-serif;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: 8px;
+  }
+
+  .download-btn:hover {
+    background: #3A6B49;
+    transform: translateY(-1px);
+  }
+
+  .error-box {
+    display: none;
+    width: 100%;
+    max-width: 620px;
+    background: #FEF0EC;
+    border: 1px solid #E8C4B0;
+    border-radius: 4px;
+    padding: 16px 20px;
+    font-size: 13px;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .divider {
+    width: 100%;
+    max-width: 620px;
+    height: 1px;
+    background: var(--border);
+    margin: 8px 0 24px;
+  }
+
+  .footer-note {
+    font-size: 12px;
+    color: var(--sub);
+    text-align: center;
+    max-width: 620px;
+    line-height: 1.6;
+  }
+
+  .reset-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 16px;
+    font-family: 'Gowun Dodum', sans-serif;
+    font-size: 13px;
+    color: var(--sub);
+    cursor: pointer;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .reset-btn:hover { border-color: var(--sub); color: var(--text); }
+
+  .guide-steps {
+    margin-top: 14px;
+    padding: 14px 16px;
+    background: #F7F2E9;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+  }
+
+  .guide-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--sub);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .guide-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text);
+    padding: 3px 0;
+  }
+
+  .guide-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    min-width: 16px;
+  }
+
+  .guide-key {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    background: #EDEAE3;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 1px 6px;
+    color: var(--sub);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">market in u · 마켓인유</div>
+  <h1>재고 대조 <span>분석기</span></h1>
+  <p class="subtitle">스캔 취합본 + 공동판매 마스터 → 최종 재고조사 보고서</p>
+</header>
+
+<!-- Step 1 -->
+<div class="card" id="card1">
+  <div class="card-header">
+    <span class="step-num">STEP 1</span>
+    <span class="card-title">스캔 취합본 업로드</span>
+    <span class="card-desc">통합 시트 포함</span>
+  </div>
+  <div class="card-body">
+    <div class="upload-zone" id="zone1">
+      <input type="file" id="file1" accept=".xlsx,.xls">
+      <div class="upload-icon">📋</div>
+      <div class="upload-text"><strong>파일을 여기에 드래그</strong>하거나 클릭해서 선택<br>시트명 <strong>통합</strong> 포함 · A열 지점명 · B열 바코드</div>
+    </div>
+    <div class="file-loaded" id="loaded1">
+      <span>✓</span>
+      <span class="filename" id="fname1"></span>
+      <span class="row-count" id="fcount1"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Step 2 -->
+<div class="card" id="card2">
+  <div class="card-header">
+    <span class="step-num">STEP 2</span>
+    <span class="card-title">공동판매 마스터 업로드</span>
+    <span class="card-desc">입고 시트 포함</span>
+  </div>
+  <div class="card-body">
+    <div class="upload-zone" id="zone2">
+      <input type="file" id="file2" accept=".xlsx,.xls">
+      <div class="upload-icon">🗂️</div>
+      <div class="upload-text"><strong>파일을 여기에 드래그</strong>하거나 클릭해서 선택<br>입고 시트 포함 · 업로드 전 K열(판매) <strong>복사 후 값 붙여넣기</strong> 필수</div>
+    </div>
+    <div class="file-loaded" id="loaded2">
+      <span>✓</span>
+      <span class="filename" id="fname2"></span>
+      <span class="row-count" id="fcount2"></span>
+    </div>
+    <div class="guide-steps">
+      <div class="guide-title">업로드 전 준비 순서</div>
+      <div class="guide-row"><span class="guide-num">①</span> 공동판매 파일 열기</div>
+      <div class="guide-row"><span class="guide-num">②</span> 입고 시트 → K열 전체 선택</div>
+      <div class="guide-row"><span class="guide-num">③</span> 복사 <span class="guide-key">Ctrl+C</span></div>
+      <div class="guide-row"><span class="guide-num">④</span> 같은 자리에 값 붙여넣기 <span class="guide-key">Ctrl+Shift+V</span> → 값만 선택</div>
+      <div class="guide-row"><span class="guide-num">⑤</span> 저장 후 이 페이지에 업로드</div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 3 -->
+<div class="card" id="card3">
+  <div class="card-header">
+    <span class="step-num">STEP 3</span>
+    <span class="card-title">전매장 매입매출장 업로드</span>
+    <span class="card-desc">매출 시트 포함</span>
+  </div>
+  <div class="card-body">
+    <div class="upload-zone" id="zone3">
+      <input type="file" id="file3" accept=".xlsx,.xls">
+      <div class="upload-icon">🛒</div>
+      <div class="upload-text"><strong>파일을 여기에 드래그</strong>하거나 클릭해서 선택<br><strong>매출</strong> 시트 · E열 바코드를 판매 완료 목록으로 사용</div>
+    </div>
+    <div class="file-loaded" id="loaded3">
+      <span>✓</span>
+      <span class="filename" id="fname3"></span>
+      <span class="row-count" id="fcount3"></span>
+    </div>
+  </div>
+</div>
+
+<button class="run-btn" id="runBtn" disabled onclick="runAnalysis()">
+  세 파일을 먼저 업로드해주세요
+</button>
+
+<div class="progress-area" id="progressArea">
+  <div class="progress-label" id="progressLabel">분석 중...</div>
+  <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+</div>
+
+<div class="error-box" id="errorBox"></div>
+
+<div class="result-area" id="resultArea">
+  <div class="result-card">
+    <div class="result-title">분석 결과 요약</div>
+    <div class="stats-grid">
+      <div class="stat-box ok">
+        <div class="stat-label">정상(매칭)</div>
+        <div class="stat-num ok" id="cnt-ok">0</div>
+      </div>
+      <div class="stat-box mis">
+        <div class="stat-label">위치불일치</div>
+        <div class="stat-num mis" id="cnt-mis">0</div>
+      </div>
+      <div class="stat-box new">
+        <div class="stat-label">장부부재(신규)</div>
+        <div class="stat-num new" id="cnt-new">0</div>
+      </div>
+      <div class="stat-box miss">
+        <div class="stat-label">미스캔(누락의심)</div>
+        <div class="stat-num miss" id="cnt-miss">0</div>
+      </div>
+    </div>
+    <button class="download-btn" onclick="downloadResult()">
+      ⬇ Excel 보고서 다운로드
+    </button>
+  </div>
+  <button class="reset-btn" id="resetBtn" onclick="resetAll()">↩ 다시 분석하기</button>
+</div>
+
+<div class="divider"></div>
+<div class="footer-note">
+  모든 처리는 브라우저 내에서만 이루어집니다 — 파일이 외부 서버로 전송되지 않습니다
+</div>
+
+<script>
+let scanData = null;   // [{store, barcode}]
+let masterData = null; // {barcode: {위치, 상품명, 금액}}
+let salesData = null;  // Set of sold barcodes from 매출 sheet column E
+let resultRows = null;
+
+// ── File Upload Handlers ──────────────────────────────────────────
+
+function setupZone(zoneId, inputId, loadedId, fnameId, fcountId, dataKey) {
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0], loadedId, fnameId, fcountId, zoneId, dataKey);
+  });
+  input.addEventListener('change', e => {
+    if (e.target.files[0]) handleFile(e.target.files[0], loadedId, fnameId, fcountId, zoneId, dataKey);
+  });
+}
+
+function handleFile(file, loadedId, fnameId, fcountId, zoneId, dataKey) {
+  showError('');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+
+      if (dataKey === 'scan') {
+        // Find 통합 sheet
+        const sheetName = wb.SheetNames.find(n => n.includes('통합')) || wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        scanData = rows
+          .filter(r => r[0] || r[1])
+          .map(r => ({ store: String(r[0] || '').trim(), barcode: normalizeBarcode(r[1]) }))
+          .filter(r => r.barcode);
+        document.getElementById(fnameId).textContent = file.name;
+        document.getElementById(fcountId).textContent = scanData.length.toLocaleString() + '건';
+      } else if (dataKey === 'master') {
+        // Find 입고 sheet
+        const sheetName = wb.SheetNames.find(n => n.includes('입고')) || wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        masterData = {};
+        let count = 0;
+        // header is row 0: no, 위치, 입고일, 상품명, 금액, 수량, 바코드, ...
+        for (let i = 1; i < rows.length; i++) {
+          const r = rows[i];
+          const barcode = normalizeBarcode(r[6]);
+          if (!barcode) continue;
+          masterData[barcode] = {
+            위치: String(r[1] || '').trim(),
+            상품명: String(r[3] || '').trim(),
+            금액: r[4],
+            판매: Number(r[10]) || 0
+          };
+          count++;
+        }
+        document.getElementById(fnameId).textContent = file.name;
+        document.getElementById(fcountId).textContent = count.toLocaleString() + '건';
+      } else {
+        const sheetName = wb.SheetNames.find(n => n.trim() === '매출');
+        if (!sheetName) throw new Error("'매출' 시트를 찾을 수 없습니다.");
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        salesData = new Set();
+        for (const r of rows) {
+          const barcode = normalizeBarcode(r[4]); // E열
+          if (!barcode || barcode === '바코드') continue;
+          salesData.add(barcode);
+        }
+        document.getElementById(fnameId).textContent = file.name;
+        document.getElementById(fcountId).textContent = salesData.size.toLocaleString() + '건';
+      }
+
+      document.getElementById(zoneId).style.display = 'none';
+      document.getElementById(loadedId).style.display = 'flex';
+      checkReady();
+    } catch (err) {
+      showError('파일을 읽는 중 오류가 발생했습니다: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// 바코드 정규화: 앞뒤/내부 공백·불가시 문자 제거 후 대문자
+function normalizeBarcode(val) {
+  return String(val || '').replace(/[\s ​　﻿]/g, '').toUpperCase();
+}
+
+setupZone('zone1', 'file1', 'loaded1', 'fname1', 'fcount1', 'scan');
+setupZone('zone2', 'file2', 'loaded2', 'fname2', 'fcount2', 'master');
+setupZone('zone3', 'file3', 'loaded3', 'fname3', 'fcount3', 'sales');
+
+function checkReady() {
+  const btn = document.getElementById('runBtn');
+  if (scanData && masterData && salesData) {
+    btn.disabled = false;
+    btn.textContent = '▶ 재고 대조 분석 시작';
+  }
+}
+
+// ── Analysis ──────────────────────────────────────────────────────
+
+function runAnalysis() {
+  document.getElementById('progressArea').style.display = 'block';
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('runBtn').textContent = '분석 중...';
+  document.getElementById('resultArea').style.display = 'none';
+
+  setTimeout(() => {
+    try {
+      doAnalysis();
+    } catch(err) {
+      showError('분석 중 오류: ' + err.message);
+      document.getElementById('progressArea').style.display = 'none';
+    }
+  }, 50);
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = label;
+}
+
+function doAnalysis() {
+  setProgress(10, '스캔 데이터 처리 중...');
+
+  const rows = [];
+  const scannedBarcodes = new Set();
+
+  // 결과 유형별 색상 코드 (Excel 배경)
+  const COLOR = {
+    '정상(매칭)':      'FF4A7C59',
+    '위치불일치':      'FFB07A20',
+    '장부부재(신규)':  'FF6B4FA0',
+    '미스캔(누락의심)': 'FF888078',
+  };
+
+  // Step 1: 스캔 데이터 처리
+  setProgress(30, '마스터 데이터와 대조 중...');
+
+  for (const item of scanData) {
+    scannedBarcodes.add(item.barcode);
+    const master = masterData[item.barcode];
+
+    if (!master) {
+      // 마스터에 없음 = 장부부재(신규)
+      rows.push({
+        지점명: item.store,
+        바코드: item.barcode,
+        장부상위치: '',
+        상품명: '',
+        금액: '',
+        대조결과: '장부부재(신규)'
+      });
+    } else {
+      const matched = master.위치 === item.store;
+      rows.push({
+        지점명: item.store,
+        바코드: item.barcode,
+        장부상위치: master.위치,
+        상품명: master.상품명,
+        금액: master.금액,
+        대조결과: matched ? '정상(매칭)' : '위치불일치'
+      });
+    }
+  }
+
+  setProgress(60, '미스캔 항목 추출 중...');
+
+  // Step 2: 미스캔 = 마스터에 있지만 실사되지 않았고, 두 판매 자료에도 없는 것
+  for (const [barcode, info] of Object.entries(masterData)) {
+    if (!scannedBarcodes.has(barcode) && info.판매 < 1 && !salesData.has(barcode)) {
+      rows.push({
+        지점명: '',       // A열 비움
+        바코드: barcode,
+        장부상위치: info.위치,
+        상품명: info.상품명,
+        금액: info.금액,
+        대조결과: '미스캔(누락의심)'
+      });
+    }
+  }
+
+  setProgress(80, '지점명 순으로 정렬 중...');
+
+  // Step 3: 정렬 — 지점명 순, 미스캔(지점명 없음)은 맨 끝
+  const ORDER = ['정상(매칭)', '위치불일치', '장부부재(신규)', '미스캔(누락의심)'];
+  rows.sort((a, b) => {
+    const storeA = a.지점명 || '\uFFFF';
+    const storeB = b.지점명 || '\uFFFF';
+    if (storeA !== storeB) return storeA.localeCompare(storeB, 'ko');
+    return ORDER.indexOf(a.대조결과) - ORDER.indexOf(b.대조결과);
+  });
+
+  setProgress(90, '결과 집계 중...');
+
+  resultRows = rows;
+
+  // Stats
+  const cnt = { ok: 0, mis: 0, new: 0, miss: 0 };
+  for (const r of rows) {
+    if (r.대조결과 === '정상(매칭)')      cnt.ok++;
+    else if (r.대조결과 === '위치불일치') cnt.mis++;
+    else if (r.대조결과 === '장부부재(신규)') cnt.new++;
+    else if (r.대조결과 === '미스캔(누락의심)') cnt.miss++;
+  }
+
+  document.getElementById('cnt-ok').textContent   = cnt.ok.toLocaleString();
+  document.getElementById('cnt-mis').textContent  = cnt.mis.toLocaleString();
+  document.getElementById('cnt-new').textContent  = cnt.new.toLocaleString();
+  document.getElementById('cnt-miss').textContent = cnt.miss.toLocaleString();
+
+  setProgress(100, '완료!');
+
+  setTimeout(() => {
+    document.getElementById('progressArea').style.display = 'none';
+    document.getElementById('resultArea').style.display = 'block';
+    document.getElementById('resetBtn').style.display = 'block';
+    document.getElementById('runBtn').textContent = '✓ 분석 완료';
+  }, 300);
+}
+
+// ── Excel Download ────────────────────────────────────────────────
+
+function downloadResult() {
+  const wb = XLSX.utils.book_new();
+
+  // Build worksheet data
+  const header = ['지점명', '바코드', '장부상위치', '상품명', '금액', '대조결과'];
+  const wsData = [header];
+  for (const r of resultRows) {
+    wsData.push([r.지점명, r.바코드, r.장부상위치, r.상품명, r.금액, r.대조결과]);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths
+  ws['!cols'] = [
+    { wch: 12 }, // 지점명
+    { wch: 12 }, // 바코드
+    { wch: 14 }, // 장부상위치
+    { wch: 36 }, // 상품명
+    { wch: 10 }, // 금액
+    { wch: 18 }, // 대조결과
+  ];
+
+  // Header style
+  const headerStyle = {
+    font: { bold: true, color: { rgb: 'FFFFFFFF' } },
+    fill: { fgColor: { rgb: 'FF2A2520' } },
+    alignment: { horizontal: 'center', vertical: 'center' }
+  };
+  for (let c = 0; c < header.length; c++) {
+    const cellRef = XLSX.utils.encode_cell({ r: 0, c });
+    if (ws[cellRef]) ws[cellRef].s = headerStyle;
+  }
+
+  // Row colors by 대조결과 — 짝수행(진한톤) / 홀수행(연한톤) 교차
+  const FILL = {
+    '정상(매칭)':      ['FFD6EDE0', 'FFEEF7F2'],
+    '위치불일치':      ['FFFCE5BC', 'FFFDF3E2'],
+    '장부부재(신규)':  ['FFE5DEFF', 'FFF3F0FB'],
+    '미스캔(누락의심)': ['FFE8E6E3', 'FFF5F4F2'],
+  };
+  const FONT_COLOR = {
+    '정상(매칭)':      'FF1E3D2A',
+    '위치불일치':      'FF4A3200',
+    '장부부재(신규)':  'FF2E1A55',
+    '미스캔(누락의심)': 'FF444040',
+  };
+
+  for (let ri = 1; ri < wsData.length; ri++) {
+    const result = wsData[ri][5];
+    const fills = FILL[result] || ['FFEEEEEE', 'FFFFFFFF'];
+    const bgColor = (ri % 2 === 0) ? fills[0] : fills[1];
+    const fontColor = FONT_COLOR[result] || 'FF000000';
+    for (let ci = 0; ci < 6; ci++) {
+      const cellRef = XLSX.utils.encode_cell({ r: ri, c: ci });
+      if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' };
+      ws[cellRef].s = {
+        fill: { fgColor: { rgb: bgColor } },
+        font: { color: { rgb: fontColor } },
+        alignment: { vertical: 'center' }
+      };
+    }
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws, '재고대조_보고서');
+
+  // filename with today's date
+  const today = new Date();
+  const ymd = today.getFullYear().toString() +
+    String(today.getMonth()+1).padStart(2,'0') +
+    String(today.getDate()).padStart(2,'0');
+  XLSX.writeFile(wb, `${ymd}_재고대조_보고서.xlsx`, { cellStyles: true });
+}
+
+// ── Helpers ───────────────────────────────────────────────────────
+
+function showError(msg) {
+  const box = document.getElementById('errorBox');
+  if (msg) {
+    box.style.display = 'block';
+    box.textContent = '⚠ ' + msg;
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+function resetAll() {
+  scanData = null;
+  masterData = null;
+  salesData = null;
+  resultRows = null;
+
+  ['zone1','zone2','zone3'].forEach(id => document.getElementById(id).style.display = 'block');
+  ['loaded1','loaded2','loaded3'].forEach(id => document.getElementById(id).style.display = 'none');
+  ['file1','file2','file3'].forEach(id => document.getElementById(id).value = '');
+
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('runBtn').textContent = '세 파일을 먼저 업로드해주세요';
+  document.getElementById('resultArea').style.display = 'none';
+  document.getElementById('progressArea').style.display = 'none';
+  document.getElementById('resetBtn').style.display = 'none';
+  showError('');
+}
+</script>
+</body>
+</html>
