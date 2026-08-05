@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>재고 대조 분석기 — 마켓인유</title>
+<title>재고대조분석기_v2</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=IBM+Plex+Mono:wght@400;600&display=swap');
@@ -66,6 +66,41 @@
     margin-top: 8px;
     font-size: 14px;
     color: var(--sub);
+  }
+
+  .overview {
+    width: 100%;
+    max-width: 620px;
+    margin: -24px 0 24px;
+    padding: 18px 20px;
+    background: #FFF8EE;
+    border: 1px solid #E8D7C2;
+    border-radius: 4px;
+  }
+
+  .overview-title {
+    font-size: 14px;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  .overview-list {
+    display: grid;
+    gap: 7px;
+    font-size: 13px;
+    color: var(--sub);
+    line-height: 1.5;
+  }
+
+  .overview-list strong { color: var(--text); }
+
+  .overview-note {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #E8D7C2;
+    font-size: 12px;
+    color: var(--accent);
+    line-height: 1.55;
   }
 
   .card {
@@ -415,10 +450,20 @@
 <body>
 
 <header>
-  <div class="brand">market in u · 마켓인유</div>
-  <h1>재고 대조 <span>분석기</span></h1>
-  <p class="subtitle">스캔 취합본 + 공동판매 마스터 → 최종 재고조사 보고서</p>
+  <div class="brand">market in u · stocktaking</div>
+  <h1>재고대조분석기<span>_v2</span></h1>
+  <p class="subtitle">실사·재고·판매 자료를 한 번에 대조해 누락 의심 항목을 찾습니다</p>
 </header>
+
+<section class="overview" aria-label="사용 안내">
+  <div class="overview-title">아래 3개 파일을 순서대로 준비해주세요</div>
+  <div class="overview-list">
+    <div><strong>① 스캔 취합본</strong> — 통합 시트 A열 지점명, B열 바코드</div>
+    <div><strong>② 공동판매 마스터</strong> — 입고 시트, K열 수식은 값으로 붙여넣은 파일</div>
+    <div><strong>③ 전매장 매입매출장</strong> — 매출 시트 E열에 판매 바코드가 있는 파일</div>
+  </div>
+  <div class="overview-note">미스캔은 실사에 없고, 공동판매 마스터에서 미판매이며, 전매장 매출 목록에도 없는 바코드만 분류합니다.</div>
+</section>
 
 <!-- Step 1 -->
 <div class="card" id="card1">
