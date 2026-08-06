@@ -435,7 +435,7 @@
   <div class="overview-title">아래 3개 파일을 순서대로 준비해주세요</div>
   <div class="overview-list">
     <div><strong>① 스캔 취합본</strong> — 통합 시트 A열 지점명, B열 바코드</div>
-    <div><strong>② 공동판매 마스터</strong> — 입고 시트, K열 수식은 값으로 붙여넣은 파일</div>
+    <div><strong>② 공동판매 마스터</strong> — 입고 시트, K열 수식은 값으로 붙여넣기 · H열 위탁은 자동 제외</div>
     <div><strong>③ 전매장 매입매출장</strong> — 매출 시트 E열 바코드, H열 수량이 있는 파일</div>
   </div>
   <div class="overview-note">미스캔은 실사에 없고 공동판매 마스터에서 미판매이며, 전매장 매출에서 바코드별 H열 수량 합계가 1 미만인 항목만 분류합니다.</div>
@@ -473,7 +473,7 @@
     <div class="upload-zone" id="zone2">
       <input type="file" id="file2" accept=".xlsx,.xls">
       <div class="upload-icon">🗂️</div>
-      <div class="upload-text"><strong>파일을 여기에 드래그</strong>하거나 클릭해서 선택<br>입고 시트 포함 · 업로드 전 K열(판매) <strong>복사 후 값 붙여넣기</strong> 필수</div>
+      <div class="upload-text"><strong>파일을 여기에 드래그</strong>하거나 클릭해서 선택<br>입고 시트 · K열(판매)은 <strong>값 붙여넣기</strong> · H열 소분류가 위탁이면 자동 제외</div>
     </div>
     <div class="file-loaded" id="loaded2">
       <span>✓</span>
@@ -560,6 +560,7 @@
 let scanData = null;   // [{store, barcode}]
 let masterData = null; // {barcode: {위치, 상품명, 금액}}
 let salesData = null;  // Set of sold barcodes from 매출 sheet column E
+let excludedBarcodes = new Set(); // 위탁 전용 바코드
 let resultRows = null;
 
 // ── File Upload Handlers ──────────────────────────────────────────
@@ -604,12 +605,18 @@ function handleFile(file, loadedId, fnameId, fcountId, zoneId, dataKey) {
         const ws = wb.Sheets[sheetName];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
         masterData = {};
+        const consignmentBarcodes = new Set();
         let count = 0;
-        // header is row 0: no, 위치, 입고일, 상품명, 금액, 수량, 바코드, ...
+        // header is row 0: no, 위치, 입고일, 상품명, 금액, 수량, 바코드, 소분류, ..., 판매
         for (let i = 1; i < rows.length; i++) {
           const r = rows[i];
           const barcode = normalizeBarcode(r[6]);
           if (!barcode) continue;
+          const subcategory = String(r[7] || '').trim();
+          if (subcategory === '위탁') {
+            consignmentBarcodes.add(barcode);
+            continue;
+          }
           masterData[barcode] = {
             위치: String(r[1] || '').trim(),
             상품명: String(r[3] || '').trim(),
@@ -618,8 +625,12 @@ function handleFile(file, loadedId, fnameId, fcountId, zoneId, dataKey) {
           };
           count++;
         }
+        excludedBarcodes = new Set(
+          [...consignmentBarcodes].filter(barcode => !masterData[barcode])
+        );
         document.getElementById(fnameId).textContent = file.name;
-        document.getElementById(fcountId).textContent = count.toLocaleString() + '건';
+        document.getElementById(fcountId).textContent =
+          count.toLocaleString() + '건 · 위탁 ' + excludedBarcodes.size.toLocaleString() + '건 제외';
       } else {
         const sheetName = wb.SheetNames.find(n => n.trim() === '매출');
         if (!sheetName) throw new Error("'매출' 시트를 찾을 수 없습니다.");
@@ -714,6 +725,7 @@ function doAnalysis() {
   setProgress(30, '마스터 데이터와 대조 중...');
 
   for (const item of scanData) {
+    if (excludedBarcodes.has(item.barcode)) continue;
     scannedBarcodes.add(item.barcode);
     const master = masterData[item.barcode];
 
@@ -886,6 +898,7 @@ function resetAll() {
   scanData = null;
   masterData = null;
   salesData = null;
+  excludedBarcodes = new Set();
   resultRows = null;
 
   ['zone1','zone2','zone3'].forEach(id => document.getElementById(id).style.display = 'block');
