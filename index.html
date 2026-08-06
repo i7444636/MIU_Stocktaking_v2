@@ -436,9 +436,9 @@
   <div class="overview-list">
     <div><strong>① 스캔 취합본</strong> — 통합 시트 A열 지점명, B열 바코드</div>
     <div><strong>② 공동판매 마스터</strong> — 입고 시트, K열 수식은 값으로 붙여넣은 파일</div>
-    <div><strong>③ 전매장 매입매출장</strong> — 매출 시트 E열에 판매 바코드가 있는 파일</div>
+    <div><strong>③ 전매장 매입매출장</strong> — 매출 시트 E열 바코드, H열 수량이 있는 파일</div>
   </div>
-  <div class="overview-note">미스캔은 실사에 없고, 공동판매 마스터에서 미판매이며, 전매장 매출 목록에도 없는 바코드만 분류합니다.</div>
+  <div class="overview-note">미스캔은 실사에 없고 공동판매 마스터에서 미판매이며, 전매장 매출에서 바코드별 H열 수량 합계가 1 미만인 항목만 분류합니다.</div>
 </section>
 
 <!-- Step 1 -->
@@ -496,13 +496,13 @@
   <div class="card-header">
     <span class="step-num">STEP 3</span>
     <span class="card-title">전매장 매입매출장 업로드</span>
-    <span class="card-desc">매출 시트 포함</span>
+    <span class="card-desc">매출 E·H열 사용</span>
   </div>
   <div class="card-body">
     <div class="upload-zone" id="zone3">
       <input type="file" id="file3" accept=".xlsx,.xls">
       <div class="upload-icon">🛒</div>
-      <div class="upload-text"><strong>파일을 여기에 드래그</strong>하거나 클릭해서 선택<br><strong>매출</strong> 시트 · E열 바코드를 판매 완료 목록으로 사용</div>
+      <div class="upload-text"><strong>파일을 여기에 드래그</strong>하거나 클릭해서 선택<br><strong>매출</strong> 시트 · E열 바코드별 H열 수량 합계가 1 이상이면 판매로 처리</div>
     </div>
     <div class="file-loaded" id="loaded3">
       <span>✓</span>
@@ -625,14 +625,20 @@ function handleFile(file, loadedId, fnameId, fcountId, zoneId, dataKey) {
         if (!sheetName) throw new Error("'매출' 시트를 찾을 수 없습니다.");
         const ws = wb.Sheets[sheetName];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-        salesData = new Set();
+        const salesQuantities = new Map();
         for (const r of rows) {
           const barcode = normalizeBarcode(r[4]); // E열
           if (!barcode || barcode === '바코드') continue;
-          salesData.add(barcode);
+          const quantity = parseQuantity(r[7]); // H열
+          salesQuantities.set(barcode, (salesQuantities.get(barcode) || 0) + quantity);
         }
+        salesData = new Set(
+          [...salesQuantities.entries()]
+            .filter(([, totalQuantity]) => totalQuantity >= 1)
+            .map(([barcode]) => barcode)
+        );
         document.getElementById(fnameId).textContent = file.name;
-        document.getElementById(fcountId).textContent = salesData.size.toLocaleString() + '건';
+        document.getElementById(fcountId).textContent = salesData.size.toLocaleString() + '건 판매';
       }
 
       document.getElementById(zoneId).style.display = 'none';
@@ -648,6 +654,11 @@ function handleFile(file, loadedId, fnameId, fcountId, zoneId, dataKey) {
 // 바코드 정규화: 앞뒤/내부 공백·불가시 문자 제거 후 대문자
 function normalizeBarcode(val) {
   return String(val || '').replace(/[\s ​　﻿]/g, '').toUpperCase();
+}
+
+function parseQuantity(val) {
+  const quantity = Number(String(val ?? '').replace(/,/g, '').trim());
+  return Number.isFinite(quantity) ? quantity : 0;
 }
 
 setupZone('zone1', 'file1', 'loaded1', 'fname1', 'fcount1', 'scan');
